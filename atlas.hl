@@ -1,0 +1,141 @@
+(* ========================================================================= *)
+(* Differential geometry in HOL Light.                                       *)
+(* ========================================================================= *)
+
+let INJ_ON = new_definition
+  `INJ_ON f s <=> (!x y:A. x IN s /\ y IN s /\ f x:B = f y ==> x = y)`;;
+
+(* ------------------------------------------------------------------------- *)
+(* Homeomorphism in the general case (topological spaces).                   *)
+(* ------------------------------------------------------------------------- *)
+
+let tophomeomorphism = new_definition
+  `!top top' f:A->B.
+      tophomeomorphism top top' f <=>
+      BIJ f (topspace top) (topspace top') /\
+      topcontinuous top top' f /\
+      topcontinuous top' top (inverse f)`;;
+
+(* ------------------------------------------------------------------------- *)
+(* Hausdorff topological spaces.                                             *)
+(* ------------------------------------------------------------------------- *)
+
+let hausdorff = new_definition
+  `hausdorff top <=>
+   !x y:A. x IN topspace top /\ y IN topspace top /\ ~(x = y)
+           ==> (?u v. open_in top u /\ open_in top v /\
+                      x IN u /\ y IN v /\ u INTER v = {})`;;
+
+let HAUSDORFF_EUCLIDEAN = prove
+ (`hausdorff (euclidean:(real^N)topology)`,
+  REWRITE_TAC[hausdorff; TOPSPACE_EUCLIDEAN; IN_UNIV; GSYM OPEN_IN;
+              SEPARATION_HAUSDORFF]);;
+
+let HAUSDORFF_SUBTOPOLOGY = prove
+ (`!top s:A->bool. hausdorff top ==> hausdorff(subtopology top s)`,
+  REPEAT GEN_TAC THEN
+  REWRITE_TAC[hausdorff; TOPSPACE_SUBTOPOLOGY; IN_INTER;
+              OPEN_IN_SUBTOPOLOGY] THEN
+  INTRO_TAC "hp; !x y; (x xINs) (y yINs) neq" THEN
+  REMOVE_THEN "hp" (MP_TAC o SPECL[`x:A`;`y:A`]) THEN
+  ANTS_TAC THENL [ASM_REWRITE_TAC[]; ALL_TAC] THEN
+  INTRO_TAC "@u v. open_u open_v xINu xINv inter" THEN
+  MAP_EVERY EXISTS_TAC [`u INTER s:A->bool`;`v INTER s:A->bool`] THEN
+  CONJ_TAC THENL [EXISTS_TAC `u:A->bool` THEN ASM_REWRITE_TAC[]; ALL_TAC] THEN
+  CONJ_TAC THENL [EXISTS_TAC `v:A->bool` THEN ASM_REWRITE_TAC[]; ALL_TAC] THEN
+  ASM_REWRITE_TAC[IN_INTER] THEN REMOVE_THEN "inter" MP_TAC THEN SET_TAC[]);;
+
+let HAUSDORFF_SUBTOPOLOGY_EUCLIDEAN = prove
+ (`!s:real^N->bool. hausdorff (subtopology euclidean s)`,
+  GEN_TAC THEN MATCH_MP_TAC HAUSDORFF_SUBTOPOLOGY THEN
+  MATCH_ACCEPT_TAC HAUSDORFF_EUCLIDEAN);;
+
+(* ------------------------------------------------------------------------- *)
+(* Diffeomorphims.                                                           *)
+(* ------------------------------------------------------------------------- *)
+
+let diffeomorphism = new_definition
+  `diffeomorphism (f:real^M->real^N) s t <=>
+   BIJ f s t /\ f differentiable_on s /\ inverse f differentiable_on t`;;
+
+(* ------------------------------------------------------------------------- *)
+(* Differentiable atlas.                                                     *)
+(* ------------------------------------------------------------------------- *)
+
+parse_as_infix("atlas_on",(12, "right"));;
+
+let atlas_on = new_definition
+  `U atlas_on s <=>
+   UNIONS {u | u,f | (u,f) IN U} = s /\
+   (!u f:A->real^N.
+      (u,f) IN U
+      ==> u SUBSET s /\ open (IMAGE f u) /\
+          f IN EXTENSIONAL u /\ INJ_ON f u) /\
+   (!u f v g.
+      (u,f) IN U /\ (v,g) IN U
+      ==> open (IMAGE f (u INTER v)) /\
+          open (IMAGE g (u INTER v)) /\
+          diffeomorphism (g o inverse f)
+            (IMAGE f (u INTER v)) (IMAGE g (u INTER v)))`;;
+
+let SUBATLAS = prove
+ (`!s U V:(A->bool)#(A->real^N)->bool.
+     U atlas_on s /\ V SUBSET U /\ UNIONS {u | u,f | (u,f) IN V} = s
+     ==> V atlas_on s`,
+  REPEAT GEN_TAC THEN SIMP_TAC[atlas_on] THEN SET_TAC[]);;
+
+(* ------------------------------------------------------------------------- *)
+(* Compatibility between two atlas.                                          *)
+(* ------------------------------------------------------------------------- *)
+
+let compatible_atlas = new_definition
+  `!s U V:(A->bool)#(A->real^N)->bool.
+     compatible_atlas s U V <=>
+     U atlas_on s /\ V atlas_on s /\ U UNION V atlas_on s`;;
+
+let COMPATIBLE_ATLAS_REFL = prove
+ (`!s U:(A->bool)#(A->real^N)->bool.
+     compatible_atlas s U U <=> U atlas_on s`,
+  REWRITE_TAC[compatible_atlas; UNION_IDEMPOT]);;
+
+let COMPATIBLE_ATLAS_SYM = prove
+ (`!s U V:(A->bool)#(A->real^N)->bool.
+     compatible_atlas s U V ==> compatible_atlas s V U`,
+  SIMP_TAC[compatible_atlas; UNION_COMM]);;
+
+(* TODO. *)
+(*
+let COMPATIBLE_ATLAS_TRANS = prove
+ (`!s U V W:(A->bool)#(A->real^N)->bool.
+     compatible_atlas s U V /\ compatible_atlas s V W
+     ==> compatible_atlas s U W`,
+*)
+
+let differentiable_strucure = new_definition
+  `!s U:(A->bool)#(A->real^N)->bool.
+     differentiable_strucure s U <=>
+     U atlas_on s /\
+     (!V. compatible_atlas s U V ==> V SUBSET U)`;;
+
+let maximal_atlas = new_definition
+  `!s U:(A->bool)#(A->real^N)->bool.
+     maximal_atlas s U = UNIONS {V | compatible_atlas s U V}`;;
+
+(* TODO *)
+(*
+let MAXIMAL_ATLAS_INC = prove
+ (`!s U:(A->bool)#(A->real^N)->bool.
+     U SUBSET maximal_atlas s U <=> U atlas_on s`,
+*)
+
+(* TODO *)
+(*
+let DIFFERENTIABLE_STRUCTURE_MAXIMAL_ATLAS = prove
+ (`!s U:(A->bool)#(A->real^N)->bool.
+     differentiable_strucure s (maximal_atlas s U) <=> U atlas_on s`,
+*)
+
+let ATLAS_ON_EMPTY = prove
+ (`({}:(A->bool)#(A->real^N)->bool) atlas_on {}`,
+  REWRITE_TAC[atlas_on; NOT_IN_EMPTY; EMPTY_GSPEC; UNIONS_0]);;
+
