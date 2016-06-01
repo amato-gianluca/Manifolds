@@ -242,3 +242,56 @@ let ATLAS_ON_EMPTY = prove
  (`({}:(A->bool)#(A->real^N)->bool) atlas_on {}`,
   REWRITE_TAC[atlas_on; NOT_IN_EMPTY; EMPTY_GSPEC; UNIONS_0]);;
 
+(* ------------------------------------------------------------------------- *)
+(* Example 1: real^N as a differentiable structure                           *)
+(* ------------------------------------------------------------------------- *)
+
+let euclidean_atlas = new_definition
+  `euclidean_atlas = {((:real^N), \x:real^N.x)}`;;
+
+let UNIONS_SING = SET_RULE `!f:A->(B->bool) a:A. UNIONS { f x | x = a } = f a`;;
+
+let INVERSE_ID = prove (`inverse (\x:A. x) = \x:A. x`, REWRITE_TAC[GSYM I_DEF; INVERSE_I] THEN REWRITE_TAC[I_DEF]);;
+
+let BIJ_ID = prove (`!s:A->bool. BIJ (\x.x) s s`, REWRITE_TAC[BIJ; INJ; SURJ] THEN MESON_TAC[]);;
+
+let SET_PROJ_LEMMA = prove
+  (`{ u | u, v | P (u:A ,v:B) } = { FST x | P x }`,
+   REWRITE_TAC[EXTENSION] THEN
+   GEN_TAC THEN
+   REWRITE_TAC[IN_ELIM_THM] THEN
+   EQ_TAC THENL
+   [
+      INTRO_TAC "@u v. h" THEN EXISTS_TAC `u:A, v:B` THEN ASM_REWRITE_TAC[]
+      ;
+      INTRO_TAC "@y. h" THEN EXISTS_TAC `FST (y:A#B)` THEN EXISTS_TAC `SND (y:A#B)` THEN ASM_REWRITE_TAC[]
+   ]
+   );;
+
+let EUCLIDEAN_ATLAS = prove
+  (`euclidean_atlas atlas_on (:real^N)`,
+   REWRITE_TAC[euclidean_atlas; atlas_on; IN_SING] THEN (REPEAT CONJ_TAC) THENL
+   [
+     REWRITE_TAC[SET_PROJ_LEMMA; UNIONS_SING]
+     ;
+     REWRITE_TAC[PAIR_EQ] THEN (REPEAT STRIP_TAC) THENL
+     [
+       SET_TAC[]
+       ;
+       ASM_REWRITE_TAC[IMAGE_ID; OPEN_UNIV]
+       ;
+       ASM_REWRITE_TAC[EXTENSIONAL; IN_ELIM_THM] THEN SET_TAC[]
+       ;
+       ASM_REWRITE_TAC[INJ_ON] THEN SET_TAC[]
+     ]
+     ;
+     REWRITE_TAC[PAIR_EQ] THEN (REPEAT STRIP_TAC) THENL
+     [
+       ASM_REWRITE_TAC[IMAGE_ID; INTER_UNIV; OPEN_UNIV]
+       ;
+       ASM_REWRITE_TAC[IMAGE_ID; INTER_UNIV; OPEN_UNIV]
+       ;
+       ASM_REWRITE_TAC[IMAGE_ID; INTER_UNIV; o_DEF; INVERSE_ID; diffeomorphism; DIFFERENTIABLE_ON_ID; BIJ_ID]
+     ]
+   ]
+  );;
