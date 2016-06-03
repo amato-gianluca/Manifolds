@@ -78,11 +78,112 @@ let atlas_on = new_definition
           diffeomorphism (g o inverse f)
             (IMAGE f (u INTER v)) (IMAGE g (u INTER v)))`;;
 
+let ATLAS_SUPPORT = prove
+ (`!s U:(A->bool)#(A->real^N)->bool.
+     U atlas_on s ==> UNIONS {u | u,f | u,f:A->real^N IN U} = s`,
+  SIMP_TAC[atlas_on]);;
+
 let SUBATLAS = prove
  (`!s U V:(A->bool)#(A->real^N)->bool.
      U atlas_on s /\ V SUBSET U /\ UNIONS {u | u,f | (u,f) IN V} = s
      ==> V atlas_on s`,
   REPEAT GEN_TAC THEN SIMP_TAC[atlas_on] THEN SET_TAC[]);;
+
+(* ------------------------------------------------------------------------- *)
+(* Atlas topology.                                                           *)
+(* ------------------------------------------------------------------------- *)
+
+let atlas_topology = new_definition
+  `atlas_topology U =
+   topology {w | w SUBSET UNIONS {u | u,f | u,f:A->real^N IN U}  /\
+                 (!u f. u,f IN U ==> open(IMAGE f (w INTER u)))}`;;
+
+let ISTOPOLOGY_ATLAS_TOPOLOGY = prove
+ (`!s U.
+     U atlas_on s
+     ==> istopology {w | w SUBSET UNIONS {u | u,f | u,f:A->real^N IN U}  /\
+                         (!u f. u,f IN U ==> open(IMAGE f (w INTER u)))}`,
+  INTRO_TAC "!s U; U" THEN REWRITE_TAC[istopology] THEN CONJ_TAC THENL
+  [REWRITE_TAC[IN_ELIM_THM; EMPTY_SUBSET; INTER_EMPTY;
+               IMAGE_CLAUSES; OPEN_EMPTY];
+   ALL_TAC] THEN
+  CONJ_TAC THENL
+  [REWRITE_TAC[IMP_CONJ; RIGHT_FORALL_IMP_THM; FORALL_IN_GSPEC] THEN
+   INTRO_TAC "![v]; v; h1; ![w]; w; h2" THEN REWRITE_TAC[IN_ELIM_THM] THEN
+   CONJ_TAC THENL [REMOVE_THEN "v" MP_TAC THEN SET_TAC[]; ALL_TAC] THEN
+   INTRO_TAC "!u f; uf" THEN
+   (SUBST1_TAC o SET_RULE)
+     `(v INTER w) INTER u = (v INTER u) INTER (w INTER u):A->bool` THEN
+   HYP_TAC "U -> _ hp _" (REWRITE_RULE[atlas_on]) THEN
+   HYP_TAC "hp: +" (SPECL[`u:A->bool`;`f:A->real^N`]) THEN
+   ANTS_TAC THENL [ASM_REWRITE_TAC[]; INTRO_TAC "su fu f inj"] THEN
+   SUBGOAL_THEN
+     `IMAGE (f:A->real^N) ((v INTER u) INTER w INTER u) =
+      IMAGE f (v INTER u) INTER IMAGE f (w INTER u)`
+     SUBST1_TAC THENL
+   [MATCH_MP_TAC IMAGE_INTER_SATURATED_GEN THEN EXISTS_TAC `u:A->bool` THEN
+    DISJ1_TAC THEN CONJ_TAC THENL [ALL_TAC; SET_TAC[]] THEN
+    HYP_TAC "inj" (REWRITE_RULE[INJ_ON]) THEN HYP SET_TAC "inj" [];
+    MATCH_MP_TAC OPEN_INTER THEN ASM_SIMP_TAC[]];
+   ALL_TAC] THEN
+  INTRO_TAC "!k; k" THEN REWRITE_TAC[IN_ELIM_THM] THEN CONJ_TAC THENL
+  [REWRITE_TAC[UNIONS_SUBSET] THEN INTRO_TAC "![v]; v" THEN
+   HYP_TAC "k: +" (SPEC `v:A->bool` o GEN_REWRITE_RULE I [SUBSET]) THEN
+   ANTS_TAC THENL [ASM_REWRITE_TAC[]; SIMP_TAC[IN_ELIM_THM]];
+   ALL_TAC] THEN
+  INTRO_TAC "!u f; uf" THEN
+  SUBGOAL_THEN `UNIONS k INTER u = UNIONS {w INTER u:A->bool | w IN k}`
+               SUBST1_TAC THENL
+  [REWRITE_TAC[GSYM SUBSET_ANTISYM_EQ] THEN CONJ_TAC THENL
+   [REWRITE_TAC[SUBSET; IN_INTER; IMP_CONJ; FORALL_IN_UNIONS] THEN
+    INTRO_TAC "![v] x; v; xv; xu" THEN REWRITE_TAC[IN_UNIONS] THEN
+    EXISTS_TAC `v INTER u:A->bool` THEN
+    HYP (MP_TAC o CONJ_LIST) "v xv xu" [] THEN SET_TAC[];
+    REWRITE_TAC[UNIONS_SUBSET; FORALL_IN_GSPEC] THEN INTRO_TAC "!w; w" THEN 
+    HYP_TAC "k: +" (SPEC `w:A->bool` o GEN_REWRITE_RULE I [SUBSET]) THEN
+    ANTS_TAC THENL [ASM_REWRITE_TAC[]; SIMP_TAC[IN_ELIM_THM]] THEN
+    INTRO_TAC "hp _" THEN REWRITE_TAC[SUBSET; IN_INTER] THEN
+    INTRO_TAC "!x; xw xu" THEN ASM_REWRITE_TAC[IN_UNIONS] THEN
+    EXISTS_TAC `w:A->bool` THEN ASM_REWRITE_TAC[]];
+   ALL_TAC] THEN
+  REWRITE_TAC[IMAGE_UNIONS] THEN MATCH_MP_TAC OPEN_UNIONS THEN
+  REWRITE_TAC[FORALL_IN_IMAGE; FORALL_IN_GSPEC] THEN INTRO_TAC "!w; w" THEN
+  HYP_TAC "k: +" (SPEC `w:A->bool` o GEN_REWRITE_RULE I [SUBSET]) THEN
+  ANTS_TAC THENL [ASM_REWRITE_TAC[]; ASM_SIMP_TAC[IN_ELIM_THM]]);;
+
+let OPEN_IN_ATLAS_TOPOLOGY = prove
+ (`!s U.
+     U atlas_on s
+     ==> (!w. open_in (atlas_topology U) w <=>
+              w SUBSET s /\
+              (!u f:A->real^N. u,f IN U ==> open(IMAGE f (w INTER u))))`,
+  INTRO_TAC "!s U; U; !w" THEN REWRITE_TAC[atlas_topology] THEN
+  HYP_TAC "U -> hp" (MATCH_MP ISTOPOLOGY_ATLAS_TOPOLOGY) THEN
+  HYP_TAC "hp" (REWRITE_RULE[topology_tybij]) THEN
+  REMOVE_THEN "hp" SUBST1_TAC THEN GEN_REWRITE_TAC LAND_CONV [GSYM IN] THEN
+  REWRITE_TAC[IN_ELIM_THM] THEN HYP_TAC "U" (REWRITE_RULE[atlas_on]) THEN
+  ASM_REWRITE_TAC[]);;
+
+(* ------------------------------------------------------------------------- *)
+(* Refinement of an atlas.                                                   *)
+(* ------------------------------------------------------------------------- *)
+
+let atlas_refinement = new_definition
+  `atlas_refinement (s:A->bool) U (V:(A->bool)#(A->real^N)->bool) <=>
+   U atlas_on s /\ V atlas_on s /\
+   (!u f. u,f IN U
+          ==> ?v g. v,g IN V /\ u SUBSET v /\ (!x. x IN u ==> f x = g x))`;;
+
+let ATLAS_REFINEMENT_REFL = prove
+ (`!s:A->bool U:(A->bool)#(A->real^N)->bool.
+     atlas_refinement s U U <=> U atlas_on s`,
+  REWRITE_TAC[atlas_refinement] THEN SET_TAC[]);;
+
+let ATLAS_REFINEMENT_TRANS = prove
+ (`!s:A->bool U V W:(A->bool)#(A->real^N)->bool.
+     atlas_refinement s U V /\ atlas_refinement s V W
+     ==> atlas_refinement s U W`,
+  REWRITE_TAC[atlas_refinement] THEN SET_TAC[]);;
 
 (* ------------------------------------------------------------------------- *)
 (* Compatibility between two atlas.                                          *)
