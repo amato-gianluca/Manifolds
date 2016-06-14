@@ -11,49 +11,42 @@ Implicit Arguments Singleton [U].
 Implicit Arguments Image.Im [U V].
 Implicit Arguments injective [U V].
 
+Tactic Notation "ensemble_extensionality" ident(x) ident(H):=
+ intros;
+  match goal with
+    [ |- ?X = ?Y ] =>
+    apply Extensionality_Ensembles;
+    unfold Same_set, Included;
+    split;
+    intros x H
+  end.
+
+Hint Resolve Full_intro Im_intro: sets.
+
 Section Sets.
 
 Context {U: Type} {V: Type}.
 
 Lemma Im_singleton: forall (x: U) (f: U->V), Image.Im (Singleton x) f = Singleton (f x).
 Proof.
-  intros x f.
-  apply Extensionality_Ensembles.
-  unfold Same_set, Included.
-  split.
-
-    intros x0 in_image_singleton.
-    case in_image_singleton.
-    intros x1 in_singleton y y_eq_f_x1.
-    induction in_singleton.
-    auto with sets.
-
-    intros x0 x0_in_singleton.
-    induction x0_in_singleton.
-    auto with sets.
+ ensemble_extensionality x0 H; repeat destruct H; auto with sets.
 Qed.
 
 Lemma Im_id: forall (S: Ensemble U), Image.Im S (fun x: U => x) = S.
 Proof.
-  intro S.
-  apply Extensionality_Ensembles.
-  unfold Same_set, Included.
-  split.
-    intros x in_image_x.
-    case in_image_x.
-    intros x0 in_s_x0 y y_eq_x0.
-    rewrite y_eq_x0.
-    trivial.
-   
-    intros.
-    apply Im_intro with (x:=x); auto.
+  ensemble_extensionality x0 H ;
+  [
+    destruct H as [? ? ? H0];
+    rewrite H0;
+    assumption
+  |
+    eauto with sets
+  ].
 Qed.
 
 Lemma Full_set_true: Full_set U = (fun x: U => True).
 Proof.
-  apply Extensionality_Ensembles.
-  unfold Same_set, Included.
-  split; [ auto with sets | intros; apply Full_intro].
+  ensemble_extensionality x0 H; auto with sets.
 Qed.
 
 Definition injective_on (f: U -> V) (A: Ensemble U) := 
@@ -71,17 +64,14 @@ Definition inverse_on (f:U -> V) (A: Ensemble U) (B: Ensemble V) (g: V -> U) :=
 
 Lemma injective_impl_injective_on: forall (f: U -> V) (A: Ensemble U), injective f -> injective_on f A.
 Proof.
-  intros f a inj_f.
-  unfold injective_on.
-  unfold injective in inj_f.
-  intros x1 x2 H.
-  destruct H as [H1 H].
-  destruct H as [H2 H3].
-  apply inj_f.
-  trivial.
+  unfold injective_on ; intuition.
 Qed.
 
 End Sets.
+
+Hint Rewrite -> @Im_singleton @Im_id @Full_set_true: sets.
+
+Hint Resolve injective_impl_injective_on: sets.
 
 (** Families has been copied by ZornsLemma.Families **)
 
@@ -100,22 +90,18 @@ Inductive FamilyIntersection (F: Family): Ensemble T :=
     (forall S:Ensemble T, In F S -> In S x) ->
     In (FamilyIntersection F) x.
 
+Hint Resolve family_union_intro: sets.
+
+Hint Resolve family_intersection_intro: sets.
+
 Lemma family_union_singleton: forall S: Ensemble T, FamilyUnion (Singleton S) = S.
 Proof.
-  intro S.
-  apply Extensionality_Ensembles.
-  unfold Same_set, Included.
-  split.
-    intros x in_fam_x.
-    induction in_fam_x as [S0 x0 in_sing_s0 in_s0_x0].
-    induction in_sing_s0.
-    assumption.
-
-    intros x in_s_x.
-    apply family_union_intro with (S:=S); auto with sets.
+  ensemble_extensionality x H; repeat destruct H; eauto with sets.
 Qed.
 
 End Families.
+
+Hint Rewrite -> @family_union_singleton: sets.
 
 (** Some definitions localized on a particular subdomain **)
 
@@ -128,8 +114,6 @@ Definition ex_filterdiff_on {K: AbsRing} {S T: NormedModule K} (f: S-> T) (U: En
 Section Manifold.
 
 Context {K: AbsRing} {S: NormedModule K} {T: Type} {X: Ensemble T}.
-
-Print Image.Im.
 
 Record Chart: Type := mkChart {
   dom: Ensemble T;
@@ -156,7 +140,6 @@ Record Atlas: Type := mkAtlas {
 }.
 End Manifold.
 
-
 Section RManifold.
   Let Rset := Full_set R.
 
@@ -164,17 +147,14 @@ Section RManifold.
 
   Let id_Rset_image_open: open (Image.Im Rset id_Rset).
   Proof.
-    rewrite Im_id.
     unfold Rset.
-    rewrite Full_set_true.
+    repeat autorewrite with sets.
     exact open_true.
   Qed.
 
   Let id_Rset_injective: injective_on id_Rset Rset.
   Proof.
-    apply injective_impl_injective_on.
-    unfold injective.
-    auto.
+    unfold injective_on; intuition.
   Qed.
 
   Definition RChart := mkChart Rset id_Rset id_Rset_image_open id_Rset_injective.
@@ -184,25 +164,8 @@ Section RManifold.
   Theorem c_total_cover: (FamilyUnion(Image.Im charts (fun chart => (dom chart)))) = Rset.
   Proof.
     unfold charts.
-    rewrite Im_singleton.
-    rewrite family_union_singleton.
+    repeat autorewrite with sets.
     trivial.
   Qed.
 
 End RManifold.
-
-
-
-(*
-Require Import Logic.ClassicalEpsilon.
-
-Definition inverse {X Y:Type} (f:X->Y) (U: Ensemble X) (V: Ensemble Y) (inj: injective_on f U) (i: inhabited X) := 
-  fun y: Y => epsilon i (fun x: X => f x = y).
-
-Lemma inverse_is_inverse: forall (X Y:Type) (f:X->Y) (U: Ensemble X) (V: Ensemble Y) (inj: injective_on f U) (i: inhabited X), inverse_on f U V (inverse f U V inj i).
-Proof.
-  intros.
-  unfold inverse.
-  unfold inverse_on.
-Qed.
-**)
